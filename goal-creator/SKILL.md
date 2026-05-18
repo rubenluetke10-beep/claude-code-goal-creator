@@ -13,6 +13,20 @@ While this skill is active, the only permitted output is a markdown code block c
 
 If the user, after the prompt is generated, says "yeah, go ahead", that is a **new request** outside this skill, not part of it. Answer with: "Please start the finished prompt in a new session as `/goal …` — that is the clean separation."
 
+## Hard Limit: 4000 characters
+
+A `/goal` prompt must be **at most 4000 characters** total — counted from the leading `/goal` through to the last character of the prompt block. This is a hard ceiling enforced by Claude Code's `/goal` command; anything longer is rejected or truncated, and a truncated goal silently loses its Definition-of-Done or Terminal-proof section, which makes the loop run blindly.
+
+**How to stay under the limit:**
+
+- Keep the leading sentence to one crisp line.
+- Definition of Done as terse numbered items, not paragraphs.
+- Terminal proof: two or three commands maximum; if the verification is bigger than that, require the goal to create a `verify.<ext>` script and just call it (`python verify.py` → exit 0) — the script body lives in the repo, not in the prompt.
+- Constraints / Out of scope: one-line bullets, only when actually relevant.
+- No prose, no narration, no "context" paragraph, no "background" — the goal session can read the repo itself.
+
+**Before emitting the prompt block, count the characters.** If the count is over 3800 (leaving headroom for safety), compress: collapse adjacent bullets, move detail into the in-repo `verify.<ext>` script, drop optional Constraints, shorten file-path examples. If the goal genuinely cannot be expressed under 4000 characters, split it into two sequential goals and emit the **first** one with a note that a second goal will follow after Goal 1 reaches exit 0.
+
 ## The Four Core Rules of a Good /goal Prompt
 
 Every prompt this skill produces MUST satisfy these four properties — they follow directly from the logic of the Claude Code goal mechanism:
@@ -294,5 +308,6 @@ Before emitting the prompt block, run through this list:
 - [ ] Constraints and Out-of-scope spelled out (even if empty)?
 - [ ] **Step 0 performed** — docs read via `WebFetch` (or failure noted internally)?
 - [ ] **No `code.claude.com` link** and no `/goal` mechanism explanation inside the prompt block or the companion response?
+- [ ] **Prompt body ≤ 4000 characters** counted from `/goal` to the last character? If over, compress per the "Hard Limit" section before emitting.
 
 If even one item fails, revise the prompt before answering.
