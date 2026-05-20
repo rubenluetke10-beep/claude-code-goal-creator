@@ -6,17 +6,18 @@ The skill never executes the goal itself. It is a **prompt translator**: you des
 
 ## What problem this solves
 
-`/goal` runs in an iterative loop until a stop condition reports success. The quality of the loop is entirely determined by the quality of that stop condition. In practice, two failure modes dominate:
+`/goal` runs in an iterative loop until a stop condition reports success. The quality of the loop is entirely determined by the quality of that stop condition. In practice, three failure modes dominate:
 
 1. **Vibe metrics** — prompts that say things like "the plugin is cleanly implemented and works well". The model can declare itself done without producing anything verifiable.
 2. **Fragile or stale proof commands** — hardcoded timestamps that break on a next-day restart, multi-level quoted PowerShell/Bash one-liners that blow up on a single special character.
+3. **Turn caps / time caps / attempt caps embedded in the prompt** — clauses like "or stop after 8 evaluator turns" or "max 3 live runs, then STOP". These defeat the entire point of `/goal`: the loop is supposed to run *until the proof is exit 0*. A cap turns the loop into a glorified `/loop` and lets the model declare itself done before the proof is actually green. If the loop diverges, the proof is wrong — fix that, not by adding a cap that lies.
 
 Goal Creator enforces four rules on every prompt it emits:
 
 1. A binary terminal proof (exit-code-based) as the stop condition.
 2. No vibe words.
 3. End state, not procedure.
-4. Robust proof commands — no hardcoded dates, no fragile nested-quoting one-liners.
+4. Robust proof commands — no hardcoded dates, no fragile nested-quoting one-liners, **no turn caps / time caps / attempt caps / token caps**. The loop runs until exit 0.
 
 ## Example
 

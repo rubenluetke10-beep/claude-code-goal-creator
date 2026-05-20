@@ -99,6 +99,30 @@ Reason: long one-liners with mixed quoting (PowerShell + git format + JSON + inl
 
 Rule of thumb: if the proof command has more than two quoting levels (`"..."` inside `"..."` inside `'...'`) or exceeds ~120 characters, the prompt should instead require "create a `verify.<ext>` script that checks X, then execute it".
 
+#### Anti-Pattern C: Turn caps, time caps, "stop after N tries" clauses
+
+**Wrong** — defeats the entire point of `/goal`:
+
+```text
+... or stop after 8 evaluator turns.
+... Maximum 3 live runs per goal session, then STOP and report.
+... If not done after 30 minutes, exit with current state.
+... Token budget capped at 100k, then bail.
+```
+
+Reason: `/goal` exists specifically to run **until the terminal proof returns exit 0**. A turn cap, time cap, attempt cap, or token cap turns the loop into a glorified `/loop` — the model declares itself "done" before the proof is actually green. This is a vibe metric in disguise ("8 turns is probably enough"). If the loop diverges and never reaches exit 0, the right fix is to **make the proof more reliable or the Definition-of-Done achievable**, not to add a cap that lies.
+
+**Right** — let the loop run, fix the proof if it diverges:
+
+- If the proof is brittle (flaky test, external dependency, slow human handoff), invest the budget in a more robust proof — not in a cap.
+- If the task genuinely cannot be auto-verified (requires human action between turns), the goal-prompt is the wrong tool; pick `/loop` or a Stop hook with custom evaluation logic instead.
+- If runtime cost is a concern, the user kills the session manually with Ctrl+C or `/goal clear`. The cap belongs in the human's hand, not embedded in the prompt.
+- If the goal is too big for one session, split it into two sequential goals (Goal 1 reaches exit 0 → Goal 2 starts), not one goal with an arbitrary cap.
+
+Rule of thumb: if the prompt body contains any of `"stop after"`, `"max N"`, `"after N turns"`, `"after N minutes"`, `"if not done by"`, `"give up after"`, `"max N tries"`, `"token budget"`, the prompt is broken. Strip the clause. If the loop then runs forever, the proof is wrong — fix the proof, not by adding a cap.
+
+A `/goal` runs until exit 0. No caps. Ever.
+
 ## Mandatory workflow for every Goal Creator request
 
 ### Step 0: Docs refresh (internal, before every prompt creation)
@@ -291,6 +315,13 @@ Assumption: Python/pytest, REST style with JSON. If different, adjust commands a
 
 ✅ Instead: read the docs **internally in Step 0**, then mention **none** of it in the output. The prompt is an order, not a textbook.
 
+❌ **Turn cap, time cap, attempt cap, or token cap inside the prompt**:
+> "... or stop after 8 evaluator turns."
+> "Maximum 3 live runs per goal session, then STOP and report."
+> "If still failing after 30 minutes, exit with current state."
+
+✅ Instead: no cap. The loop runs until the terminal proof returns exit 0. If it diverges, the proof or Definition-of-Done is wrong — fix that, not by adding a lying cap. (Anti-pattern C)
+
 ## Tone
 
 Analytical, direct, precise. No softening, no disclaimers, no "maybe/could" hedges. If a proof cannot be constructed, say so bluntly and ask the targeted question.
@@ -305,6 +336,7 @@ Before emitting the prompt block, run through this list:
 - [ ] Definition of Done is a list of concrete artifacts (files/tests/outputs)?
 - [ ] **No hardcoded date / no clock time / no cutoff date** inside the proof command? (Anti-pattern A)
 - [ ] **No fragile one-liner with multi-level nested quoting** (>2 quoting levels or >120 characters)? If the logic is complex: require creating a `verify.<ext>` script instead. (Anti-pattern B)
+- [ ] **No turn cap, time cap, attempt cap, or token cap clause** anywhere in the prompt body? Grep the draft for `"stop after"`, `"max N"`, `"after N turns"`, `"after N minutes"`, `"give up"`, `"token budget"` — if any hit, strip. (Anti-pattern C)
 - [ ] Constraints and Out-of-scope spelled out (even if empty)?
 - [ ] **Step 0 performed** — docs read via `WebFetch` (or failure noted internally)?
 - [ ] **No `code.claude.com` link** and no `/goal` mechanism explanation inside the prompt block or the companion response?
